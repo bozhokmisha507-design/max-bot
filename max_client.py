@@ -122,14 +122,32 @@ class MaxClient:
                               text: Optional[str] = None,
                               attachments: Optional[list] = None,
                               notification: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Отвечает на нажатие inline-кнопки через POST /answers.
+        MAX API требует либо объект 'message' (с text/attachments внутри),
+        либо поле 'notification'. Иначе возвращает 400 'proto.payload'.
+        """
         params = {"callback_id": callback_id}
         body: Dict[str, Any] = {}
-        if text is not None:
-            body["text"] = text
-        if attachments is not None:
-            body["attachments"] = attachments
+
+        # Если есть текст или вложения — формируем объект message
+        if text is not None or attachments is not None:
+            message: Dict[str, Any] = {}
+            if text is not None:
+                message["text"] = text
+            if attachments is not None:
+                message["attachments"] = attachments
+            body["message"] = message
+
+        # Если передан notification — добавляем (можно вместе с message)
         if notification is not None:
             body["notification"] = notification
+
+        # Если ничего не передано — безопасный fallback,
+        # чтобы не получить 400 от API
+        if not body:
+            body["notification"] = "✅"
+
         return await self.request("POST", "/answers", params=params, json=body)
 
     # ---------- Медиа ----------
