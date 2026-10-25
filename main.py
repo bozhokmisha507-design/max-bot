@@ -7,6 +7,7 @@ from database import get_db, close_db
 from fsm import fsm
 from keyboards import main_menu_keyboard
 from max_client import MaxClient, build_ssl_context
+from certs_utils import ensure_mincifry_certs
 
 import handlers.start as start_h
 import handlers.menu as menu_h
@@ -174,15 +175,12 @@ async def handle_callback(client: MaxClient, update: dict, db):
         await styles_h.handle_model_selected(client, user_id, None, callback_id, payload, db)
     elif payload == "use_token":
         await client.answer_callback(callback_id, text="💎 Генерируем…")
-        # Быстрый запуск генерации через жетоны (упрощённо)
         data = fsm.get(user_id)
         style = data.get("selected_style")
         model = data.get("selected_model", "gemini")
         if not style:
             await client.answer_callback(callback_id, text="❌ Сначала выберите стиль.")
             return
-        # Здесь в идеале переиспользовать generate_photo_with_tokens из styles.py,
-        # но для MVP упростим через прямую генерацию:
         await styles_h.generate_photo_with_tokens(client, user_id, None, db, style, model)
     elif payload == "buy_generation":
         await client.answer_callback(callback_id, text="💳 Создаём платёж…")
@@ -273,7 +271,6 @@ async def clean_old_files_job():
 
 async def scheduler_loop():
     while True:
-        # ждём до 03:00 следующего дня
         from datetime import datetime, timedelta
         now = datetime.now()
         target = now.replace(hour=3, minute=0, second=0, microsecond=0)
@@ -293,6 +290,16 @@ async def main():
     Config.ensure_dirs()
     logger.info("✅ Конфигурация валидна")
 
+    # Скачиваем сертификаты Минцифры и подмешиваем их к системным.
+    # Должно выполняться ДО build_ssl_context(), иначе aiohttp
+    # не увидит SSL_CERT_FILE.
+    if Config.MAX_SSL_VERIFY:
+        try:
+            bundle = ensure_mincifry_certs()
+            logger.info(f"✅ Сертификаты Минцифры готовы: {bundle}")
+        except Exception as e:
+            logger.error(f"⚠️ Не удалось подготовить сертификаты Минцифры: {e}")
+
     db = await get_db()
     logger.info("✅ БД подключена")
 
@@ -308,7 +315,6 @@ async def main():
         await close_db()
         return
 
-    # Веб-сервер (для ЮKassa-вебхука всегда, для MAX — если webhook)
     from webhook_server import start_webhook_server
     runner = await start_webhook_server(client, db)
 
