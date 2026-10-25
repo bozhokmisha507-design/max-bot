@@ -1,0 +1,28 @@
+# Секреты
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+.pytest_cache/
+
+# Сертификаты
+certs/
+
+# Пользовательские файлы
+uploads/
+outputs/
+
+# Логи
+*.log
+
+# IDE
+.idea/
+.vscode/
